@@ -1,0 +1,14 @@
+colname,description
+price,The price of the house.
+area,The total area of the house in square feet.
+bedrooms,The number of bedrooms in the house.
+bathrooms,The number of bathrooms in the house.
+stories,The number of stories in the house.
+mainroad,Whether the house is connected to the main road (Yes/No).
+guestroom,Whether the house has a guest room (Yes/No).
+basement,Whether the house has a basement (Yes/No).
+hotwaterheating,Whether the house has a hot water heating system (Yes/No).
+airconditioning,Whether the house has an air conditioning system (Yes/No).
+parking,The number of parking spaces available within the house.
+prefarea,Whether the house is located in a preferred area (Yes/No).
+furnishingstatus,The furnishing status of the house (Fully Furnished; Semi-Furnished; Unfurnished).

@@ -1,0 +1,14 @@
+colname,description
+school,Type of school
+sex,Gender of Student
+age,Age of Student
+address,Address of Student
+famsize,Size of Family
+Pstatus,Status of Parents
+Medu,Education of Mother (ranked 1 to 5 )
+Fedu,Education of Father (ranked 1 to 5 )
+Mjob,occupation of Mother
+Fjob,occupation of Father
+G1,Grade for period 1
+G2,Grade for period 2
+G3,Final grade
