@@ -12,20 +12,46 @@ Dataset sources (Kaggle):
 
 The datasets are copied to folders `housing-price-prediction/`, `mobile-price-classification/`, `student-performance-data/`
 
-The mobile price dataset is downsampled to 512 objects (in pandas: `df.sample(512, random_state=42)`) to speed the calculations up
-
-For datasets with a prediciton task, the target is binnized using `pd.qcut(..., 2)`.
-
 # Task 2
+
+## Code
 
 Data perparation and classification using sklearn, xgboost and CatBoost can be found in the notebook 
 - `LazyFCA-sklearn-xgb-catboost.ipynb`
 
-# Task 3 & 4
+## Data preparation
+
+Numerical attributes were tranformed using Standard Sclaer from sklearn. Boolean and Categorical attributes were one-hot encoded.
+
+## Paramter tuning
+
+Best parameters were chosen using param grid searches using GridSearchCV
+
+# Task 3 & 4 
+
+## Metrics
 
 I chose `f1_macro` as a metric for comaring the predictions as it captures recall and precision for both classes. `AUC ROC` can't be used as we can't calculate probabilities for each class.
 
-The code for cross-validation using this metric and grid search implementation can be found in `fca_utils.py`.
+## Data Preparation
+
+The mobile price dataset is downsampled to 512 objects (in pandas: `df.sample(512, random_state=42)`) to speed the calculations up
+
+For datasets with a prediciton task, the target is binnized using `pd.qcut(..., 2)`.
+
+## Parameter tuning
+
+Parameter tuning concerned binarization of data:
+
+- Binning with a parameter of number of bins (Using quantiles)
+
+- One-hot encoding with a parameter of subset of attributes
+
+- Ordinal Encoding with a parameter of subset of attributes
+
+## Code
+
+The code for cross-validation using this metric and grid search implementation can be found in `fca_utils.py`
 
 Data preparation and param tuning for binary and pattern classifiers can be found in the notebooks:
 
@@ -35,7 +61,9 @@ Data preparation and param tuning for binary and pattern classifiers can be foun
 
 `fcalc/` contains the modified code for LazyFCA, speedup using Pytorch.
 
-The comparison between these methods (cross-validation results):
+## Results table
+
+The comparison between these methods for the best parameters found (cross-validation results):
 
 |    | classifier          |   f1_macro_mobile |   f1_macro_housing |   f1_macro_student |
 |---:|:--------------------|------------------:|-------------------:|-------------------:|
