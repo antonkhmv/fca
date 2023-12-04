@@ -3,7 +3,6 @@ import numpy as np
 import fcalc
 
 from sklearn.metrics import f1_score
-from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
 from itertools import product
 from collections import Counter
@@ -110,8 +109,7 @@ def prepare_data(
     return result
 
 
-def iter_folds(df, classifier, y_target, n_folds, config, method, **kwargs):
-    
+def iterate_cross_validation(df, classifier, y_target, n_folds, config, method, **kwargs):
     df_prepared = prepare_data(df, **config)
     X = df_prepared.drop(y_target, axis=1)
     y = df_prepared[y_target]
@@ -121,7 +119,7 @@ def iter_folds(df, classifier, y_target, n_folds, config, method, **kwargs):
     if cat_names:
         kwargs['categorical'] = np.arange(X.shape[1])[X.columns.isin(cat_names)]
 
-    for i, (train_index, test_index) in enumerate(kf.split(X)):
+    for train_index, test_index in kf.split(X):
         X_train, y_train = X.loc[train_index], y.loc[train_index]
         X_test, y_test = X.loc[test_index], y.loc[test_index]
 
@@ -134,8 +132,7 @@ def calulate_best_intersections(df, classifier, y_target, n_folds, config, metho
     pos_intersections = Counter()
     neg_intersections = Counter()
     
-    for X_train, y_train, X_test, y_test, clf in iter_folds(df, classifier, y_target, n_folds, config, method, **kwargs):
-            
+    for X_train, y_train, X_test, _, clf in iterate_cross_validation(df, classifier, y_target, n_folds, config, method, **kwargs):
         train_pos = X_train[y_train == True]
         train_neg = X_train[y_train == False]
         
@@ -181,18 +178,16 @@ def calulate_best_intersections(df, classifier, y_target, n_folds, config, metho
 
 
 def grid_search(df, classifier, y_target, n_folds, methods, configs, **kwargs):
-    results = []
     params = list(product(methods, configs))
     print(f"Fitting {len(params)} configurations")
-    
     tracker = Tracker()
     
     for method, config in params:
         f1_score_1 = []
         f1_score_0 = []
         f1_macro = []
-            
-        for _, _, _, y_test, clf in iter_folds(df, classifier, y_target, n_folds, config, method, **kwargs):
+
+        for _, _, _, y_test, clf in iterate_cross_validation(df, classifier, y_target, n_folds, config, method, **kwargs):
             f1_score_1.append( f1_score(y_test, clf.predictions > 0) )
             f1_score_0.append( f1_score(1 - y_test, clf.predictions <= 0) )
             f1_macro.append( f1_score(y_test, clf.predictions > 0, average='macro') )
