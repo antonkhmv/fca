@@ -14,11 +14,6 @@ The datasets are copied to folders `housing-price-prediction/`, `mobile-price-cl
 
 # Task 2
 
-## Code
-
-Data perparation and classification using sklearn, xgboost and CatBoost can be found in the notebook 
-- `LazyFCA-sklearn-xgb-catboost.ipynb`
-
 ## Data preparation
 
 Numerical attributes were tranformed using Standard Sclaer from sklearn. Boolean and Categorical attributes were one-hot encoded.
@@ -26,6 +21,11 @@ Numerical attributes were tranformed using Standard Sclaer from sklearn. Boolean
 ## Paramter tuning
 
 Best parameters were chosen using param grid searches using GridSearchCV
+
+## Code
+
+Data perparation and classification using sklearn, xgboost and CatBoost can be found in the notebook 
+- `LazyFCA-sklearn-xgb-catboost.ipynb`
 
 # Task 3 & 4 
 
