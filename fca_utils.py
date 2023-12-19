@@ -1,46 +1,12 @@
 import pandas as pd
 import numpy as np
 import fcalc
+import yaml
+import optuna
 
 from sklearn.metrics import f1_score
 from sklearn.model_selection import KFold
-from itertools import product
 from collections import Counter
-
-
-class Tracker:
-    def __init__(self, mode="max"):
-        if mode not in ['min', 'max']:
-            raise ValueError(repr(self.mode) + " unknown mode")
-        self.mode = mode
-        self.values = {None: float({'min': 'inf', 'max': '-inf'}[mode])}
-        self.configs = {None: None}
-        self.best_index = None
-        self.index = 0
-    
-    def track(self, value, config):
-        if self.is_best(value):
-            self.best_index = self.index
-        self.values[self.index] = value
-        self.configs[self.index] = config
-        self.index += 1
-
-    def get_best(self):
-        return self.values[self.best_index]
-        
-    def get_best_config(self):
-        return self.configs[self.best_index]
-
-    def is_best(self, value):
-        if self.mode == 'max':
-            return value > self.get_best()
-        elif self.mode == 'min':
-            return value < self.get_best()
-
-
-def build_configs(param_grid):
-    sets = [[(key, value) for value in values] for key, values in param_grid.items()]
-    return list(map(dict, product(*sets)))
 
 
 def common_prepare(
@@ -97,7 +63,7 @@ def prepare_data(
     result = pd.concat(parts, axis=1)
     
     if binarize_all:
-        assert (result.dtypes == 'int64').all(), result.dtypes
+        assert (result.dtypes == 'int64').all(), [result.dtypes, parts[0].dtypes]
         nonbinary = []
         for col in result:
             if len(result[col].unique()) > 2:
@@ -109,37 +75,65 @@ def prepare_data(
     return result
 
 
-def iterate_cross_validation(df, classifier, y_target, n_folds, config, method, **kwargs):
-    df_prepared = prepare_data(df, **config)
+def cross_validation(config, df, y_target, n_folds):
+    config = dict(config)
+    df_prepared = prepare_data(df, **config.pop("data_config"))
     X = df_prepared.drop(y_target, axis=1)
     y = df_prepared[y_target]
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
-    
-    cat_names = kwargs.get('categorical', None)
-    if cat_names:
-        kwargs['categorical'] = np.arange(X.shape[1])[X.columns.isin(cat_names)]
 
-    for train_index, test_index in kf.split(X):
+    classifier = config.pop("classifier")
+    cat_names = config.pop('categorical')
+    
+    if cat_names:
+        config['categorical'] = np.where(X.columns.isin(cat_names))[0]
+
+    for i, (train_index, test_index) in enumerate(kf.split(X)):
         X_train, y_train = X.loc[train_index], y.loc[train_index]
         X_test, y_test = X.loc[test_index], y.loc[test_index]
 
-        clf = classifier(X_train.values, y_train.to_numpy(), method=method, **kwargs)
+        clf = classifier(X_train.values, y_train.to_numpy(), **config)
         clf.predict(X_test.values)
         yield X_train, y_train, X_test, y_test, clf
 
 
-def calulate_best_intersections(df, classifier, y_target, n_folds, config, method, **kwargs):
+def run_prediction(trial, config, df, y_target, n_folds):
+    f1_score_1 = []
+    f1_score_0 = []
+    f1_macro = []
+    
+    for _, _, _, y_test, clf in cross_validation(config, df, y_target, n_folds):
+        f1_score_1.append( f1_score(y_test, clf.predictions > 0) )
+        f1_score_0.append( f1_score(1 - y_test, clf.predictions <= 0) )
+        f1_macro.append( f1_score(y_test, clf.predictions > 0, average='macro') )
+
+    trial.set_user_attr("f1_score_1", f1_score_1)
+    trial.set_user_attr("f1_score_0", f1_score_0)
+    trial.set_user_attr("f1_macro", f1_macro)
+
+    if np.isnan(f1_macro).any():
+        return 0.0
+    
+    return np.mean(f1_macro)
+
+
+def calulate_best_intersections(trial, df, y_target, n_folds):
+    
+    config = dict(trial.user_attrs['config'])
+    config['classifier'] = eval(config['classifier'])
+    
     pos_intersections = Counter()
     neg_intersections = Counter()
     
-    for X_train, y_train, X_test, _, clf in iterate_cross_validation(df, classifier, y_target, n_folds, config, method, **kwargs):
+    for X_train, y_train, X_test, y_test, clf in cross_validation(config, df, y_target, n_folds):
+            
         train_pos = X_train[y_train == True]
         train_neg = X_train[y_train == False]
         
         positive = []
         negative = []
 
-        if classifier == fcalc.classifier.BinarizedBinaryClassifier:
+        if config["classifier"] == fcalc.classifier.BinarizedBinaryClassifier:
             for i in range(len(X_test)):
                 for k, train, output in zip([0, 1], [train_pos, train_neg], [positive, negative]):
                     for j in range(len(train)):
@@ -148,9 +142,9 @@ def calulate_best_intersections(df, classifier, y_target, n_folds, config, metho
                             output.append(X_inter)
 
         else:
-            categorical = kwargs.get('categorical')
-            noncat_names = np.arange(X_train.shape[1])[~X_train.columns.isin(categorical)]
-            cat_names = np.arange(X_train.shape[1])[X_train.columns.isin(categorical)]
+            categorical = config.get('categorical')
+            noncat_names = np.where(~X_train.columns.isin(categorical))[0]
+            cat_names = np.where(X_train.columns.isin(categorical))[0]
             
             # Equality tolerance
             X_tolerance = 0.1 * X_train.iloc[:, noncat_names].std()
@@ -177,36 +171,58 @@ def calulate_best_intersections(df, classifier, y_target, n_folds, config, metho
     return pos_intersections, neg_intersections
 
 
-def grid_search(df, classifier, y_target, n_folds, methods, configs, **kwargs):
-    params = list(product(methods, configs))
-    print(f"Fitting {len(params)} configurations")
-    tracker = Tracker()
+def merge(tuples):
+    result = {}
+    total = 0
+    for features, count in tuples:
+        for feature in features:
+            result[feature] = result.get(feature, 0) + count
+            total += count
+    return [(key, value / total) for key, value in sorted(result.items(), key=lambda x: -x[1])][:10]
+
+
+def print_results(best_trial, result_name, intersections):
+    print("F1 values for each fold:")
+    for name, values in best_trial.user_attrs.items():
+        if name.startswith("f1_"):
+            print(f"{name} \t {' '.join(f'{value:.3f}' for value in values)}")
+    print()
+    print(f"Best config for {result_name}:")
+    print(yaml.dump(best_trial.user_attrs["config"]))
+    print()
     
-    for method, config in params:
-        f1_score_1 = []
-        f1_score_0 = []
-        f1_macro = []
+    positive_intersections = intersections[0].most_common(10)
+    negative_intersections = intersections[1].most_common(10)
+    
+    print("Most important positive intersections:")
+    print("\n".join(map(str, positive_intersections)))
+    print()
+    print("Most important positive features:")
+    print("\n".join(map(str, merge(positive_intersections))))
+    print()
+    print("Most important negative intersections:")
+    print("\n".join(map(str, negative_intersections)))
+    print()
+    print("Most important negative features:")
+    print("\n".join(map(str, merge(negative_intersections))))
+    print()
+    print(f"Best f1_macro score for {result_name}: {best_trial.values[0]:.3f}")
 
-        for _, _, _, y_test, clf in iterate_cross_validation(df, classifier, y_target, n_folds, config, method, **kwargs):
-            f1_score_1.append( f1_score(y_test, clf.predictions > 0) )
-            f1_score_0.append( f1_score(1 - y_test, clf.predictions <= 0) )
-            f1_macro.append( f1_score(y_test, clf.predictions > 0, average='macro') )
+    
+def load_study(results_name):
+    study = optuna.load_study(
+        study_name=f"{results_name}", 
+        storage=f"sqlite:///{results_name}.db"
+    )
+    return study
 
-        metric = np.mean(f1_macro)
-        tracker.track(metric, (method, config))
-        
-        print(
-            tracker.index,
-            f"{classifier=}",
-            f"{config=}", 
-            f"{method=}",
-            f"f1_macro (mean)={metric}",
-            f"f1_cls_1={f1_score_1}",
-            f"f1_cls_0={f1_score_0}",
-            f"f1_macro={f1_macro}",
-            "",
-            sep='\n'
-        )
-    method, config = tracker.get_best_config()
-    intersections = calulate_best_intersections(df, classifier, y_target, n_folds, config, method, **kwargs)
-    return tracker.get_best_config(), intersections, tracker.get_best()
+
+def show(df, target, study):
+    best_intersections = calulate_best_intersections(
+        study.best_trial, 
+        df=df, 
+        y_target=target, 
+        n_folds=5
+    )
+
+    print_results(study.best_trial, study.study_name, best_intersections)
