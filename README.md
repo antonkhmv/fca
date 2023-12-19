@@ -201,18 +201,30 @@ The Mobile dataset is best classified by a simple Logistic Regression. It has li
 
 #### Housing dataset
 
+##### Binary parameter plot
+
 ![binary](plots/housing_binary.png)
+
+##### Pattern parameter plot
 
 ![pattern](plots/housing_pattern.png)
 
 #### Mobile dataset
 
+##### Binary parameter plot
+
 ![binary](plots/mobile_binary.png)
+
+##### Pattern parameter plot
 
 ![pattern](plots/mobile_pattern.png)
 
 #### Students dataset
 
+##### Binary parameter plot
+
 ![binary](plots/students_binary.png)
+
+##### Pattern parameter plot
 
 ![pattern](plots/students_pattern.png)
