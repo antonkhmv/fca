@@ -6,25 +6,34 @@ By: Khomyakov Anton
 
 1. [Housing Prices](https://www.kaggle.com/datasets/harishkumardatalab/housing-price-prediction)
 
-House price prediction based on area, number of bedrooms, etc.
+- House price prediction based on area, number of bedrooms, etc.
 
-5 numerical features, 6 boolean feautres, 1 categorical
+- 545 rows, no nulls.
+
+- 5 numerical features, 6 boolean feautres, 1 categorical
 
 2. [Student Performance](https://www.kaggle.com/datasets/devansodariya/student-performance-data)
 
-Prediction of student's preformance in exams based on the school, gender, age, family education, etc.
+- Prediction of student's preformance in exams based on the school, gender, age, family education, etc.
 
-13 numerical features, 8 boolean feautres, 9 categorical
+- 395 rows, no nulls.
+
+- 13 numerical features, 8 boolean feautres, 9 categorical
 
 3. [Mobile Price Classification](https://www.kaggle.com/datasets/iabhishekofficial/mobile-price-classification)
 
-Mobile phone price prediction based on size of ram, battery, clock_speed, etc.
+- Mobile phone price prediction based on size of ram, battery, clock_speed, etc.
 
-14 numerical features, 6 boolean feautres, 1 categorical
+- 2000 rows, no nulls. Downsampled to 512 to imporve performance.
+
+- 14 numerical features, 6 boolean feautres, 1 categorical
 
 ## Metrics
 
-I chose `f1_macro` as a metric for comaring the predictions as it captures recall and precision for both classes. `AUC ROC` can't be used as we can't calculate probabilities for each class.
+I chose `f1_macro` as a metric for comaring the predictions as it captures recall and precision for both classes. `AUC ROC` cannot be used for `FCA`  because there's no straightforward way to calculate probabilities for each class.
+
+All metrics for both standard ML methods and FCA were measured using Cross-Valdation with N=5 folds.
+
 
 ## Classification with models from sklearn and other ML libraries
 
@@ -149,7 +158,7 @@ Parameter tuning concerned also binarization of data:
 
 - Ordinal Encoding with a parameter of subset of attributes
 
-For FCA parameter tuning was done using `optuna`.
+For FCA parameter tuning was done using `optuna` which gives a way to visualize the results of the experiments.
 
 ## Code
 
@@ -177,15 +186,16 @@ The comparison between these methods for the best parameters found (cross-valida
 |  7 | Binary Classifier   |          0.911 |           **0.817** |          **0.608** |
 |  8 | Pattern Classifier  |          0.915 |       0.808 |       0.603 |
 
-So, the binary classifier gave the best results for 2 of the datasets - Housing and Student.
+For standar ML methods, XGBoost had the best performance, while Decision tree performed the worst.
 
-For the Mobile and Student datasets the most important intersections counts for patterns are in the range 4-6, which probably means that the objects contain too many columns and the algorithm overfits on less likely combinations. 
+The binary classifier showed the best results for 2 of the datasets - Housing and Student. This is most likely due to using a lot of different data configs for parameter tuning.
 
-The Housing dataset gives the biggest jump in performance when using FCA relative to other datasets.
+For the Mobile and Student datasets the most frequent intersections counts for patterns were in the range 5-10, which probably means that the objects contain too many columns and the algorithm overfits on infreqent combinations.
 
-The Mobile dataset is best classified by a simple Logistic Regression.
+The Housing dataset gives the biggest jump in performance when using FCA relative to other datasets. 
 
-The results 
+The Mobile dataset is best classified by a simple Logistic Regression. It has little categorical features so FCA and other standard ML methods don't preform as well. FCA performed the worst on that dataset.
+
 
 ## Parameter visualization
 
