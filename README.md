@@ -187,7 +187,7 @@ The Mobile dataset is best classified by a simple Logistic Regression.
 
 The results 
 
-## Parameter importances
+## Parameter visualization
 
 #### Housing dataset
 
